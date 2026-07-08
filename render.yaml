@@ -2,10 +2,8 @@ services:
   - type: web
     name: safecall-cm
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python manage.py migrate
     startCommand: gunicorn safecall.wsgi:application
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
-      - key: DEBUG
-        value: False
