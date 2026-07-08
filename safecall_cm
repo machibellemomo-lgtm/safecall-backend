@@ -1,0 +1,22 @@
+import os
+import django
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'safecall.settings')
+django.setup()
+
+from django.contrib.auth.models import User
+
+username = 'admin'
+password = 'admin1234'
+email = 'admin@safecall.cm'
+
+if User.objects.filter(username=username).exists():
+    u = User.objects.get(username=username)
+    u.set_password(password)
+    u.is_staff = True
+    u.is_superuser = True
+    u.save()
+    print(f"Mot de passe de {username} mis a jour avec succes !")
+else:
+    User.objects.create_superuser(username, email, password)
+    print(f"Compte {username} cree avec succes !")

@@ -2,7 +2,7 @@ services:
   - type: web
     name: safecall-cm
     env: python
-    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py shell -c "from django.contrib.auth.models import User; u, created = User.objects.get_or_create(username='admin'); u.is_staff=True; u.is_superuser=True; u.set_password('admin1234'); u.save()"
+    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput && python create_admin.py
     startCommand: gunicorn safecall.wsgi:application
     envVars:
       - key: PYTHON_VERSION
