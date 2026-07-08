@@ -2,7 +2,7 @@ services:
   - type: web
     name: safecall-cm
     env: python
-    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py shell -c "from django.contrib.auth.models import User; User.objects.create_superuser('admin', '', 'SafeCall2026!') if not User.objects.filter(username='admin').exists() else None"
+    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py shell -c "from django.contrib.auth.models import User; User.objects.create_superuser('admin', '', 'admin1234') if not User.objects.filter(username='admin').exists() else None"
     startCommand: gunicorn safecall.wsgi:application
     envVars:
       - key: PYTHON_VERSION
