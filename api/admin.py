@@ -5,7 +5,8 @@ from .models import (
     Signalement,
     CampagneArnaque,
     LienMalveillant,
-    BlocageUtilisateur
+    BlocageUtilisateur,
+    TypeImpact,          # ← ajouté
 )
 
 @admin.register(ProfilUtilisateur)
@@ -16,17 +17,18 @@ class ProfilUtilisateurAdmin(admin.ModelAdmin):
 
 @admin.register(NumeroCommunautaire)
 class NumeroCommunautaireAdmin(admin.ModelAdmin):
-    list_display = ['numero', 'type_arnaque', 'niveau', 'nombre_signalements', 'score_confiance', 'confirme', 'dernier_signalement']
-    search_fields = ['numero', 'description']
-    list_filter = ['type_arnaque', 'niveau', 'confirme']
+    list_display = ['numero', 'operateur', 'nom_precis', 'type_arnaque', 'niveau', 'nombre_signalements', 'score_confiance', 'confirme', 'dernier_signalement']
+    search_fields = ['numero', 'description', 'nom_precis']
+    list_filter = ['operateur', 'type_arnaque', 'niveau', 'confirme']
     list_editable = ['niveau', 'confirme']
 
 @admin.register(Signalement)
 class SignalementAdmin(admin.ModelAdmin):
-    list_display = ['numero_signale', 'type_arnaque', 'utilisateur', 'date_signalement', 'valide']
-    search_fields = ['numero_signale', 'message_recu']
-    list_filter = ['type_arnaque', 'valide']
+    list_display = ['numero_signale', 'operateur', 'type_arnaque', 'moyen_utilise', 'date_incident', 'attaque_reussie', 'utilisateur', 'date_signalement', 'valide']
+    search_fields = ['numero_signale', 'message_recu', 'nom_declarant']
+    list_filter = ['operateur', 'type_arnaque', 'moyen_utilise', 'attaque_reussie', 'valide', 'date_approximative']
     list_editable = ['valide']
+    filter_horizontal = ['types_impact']   # ← case à cocher plus pratique pour le multi-choix
 
 @admin.register(CampagneArnaque)
 class CampagneArnaqueAdmin(admin.ModelAdmin):
@@ -45,3 +47,8 @@ class BlocageUtilisateurAdmin(admin.ModelAdmin):
     list_display = ['utilisateur', 'numero_bloque', 'date_blocage', 'bloque_manuellement', 'exception']
     search_fields = ['numero_bloque']
     list_filter = ['bloque_manuellement', 'exception']
+
+@admin.register(TypeImpact)                    # ← nouveau
+class TypeImpactAdmin(admin.ModelAdmin):
+    list_display = ['code', 'libelle']
+    search_fields = ['code', 'libelle']
