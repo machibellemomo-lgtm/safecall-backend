@@ -1,9 +1,10 @@
 import re
 
 # ============================================================
-# MOTS-CLÉS CRITIQUES — Score très élevé
+# MOTS-CLÉS — CONFIRMATION ABSOLUE (faux conseiller)
+# Aucun agent légitime ne demande jamais ça → score maximal direct
 # ============================================================
-MOTS_CRITIQUES = [
+MOTS_CONFIRMATION = [
     "tapez votre code",
     "entrez votre pin",
     "confirmez votre code",
@@ -19,131 +20,143 @@ MOTS_CRITIQUES = [
     "taper *",
     "composez le",
     "envoyez votre",
+    "donnez votre code",
+    "communiquez votre code",
 ]
 
 # ============================================================
-# MOTS-CLÉS SUSPECTS — Score moyen
+# MOTS-CLÉS FAUSSE LOTERIE / GAIN
+# ============================================================
+MOTS_LOTERIE = [
+    "vous avez gagné", "vous avez gagne", "félicitations", "felicitations",
+    "gagnant", "loterie", "tombola", "tirage au sort",
+    "prix a gagner", "prix à gagner", "cadeau", "récompense", "recompense",
+]
+
+# ============================================================
+# MOTS-CLÉS SUSPECTS GÉNÉRAUX
 # ============================================================
 MOTS_SUSPECTS = [
-    "vous avez reçu",
-    "vous avez recu",
-    "félicitations",
-    "felicitations",
-    "vous avez gagné",
-    "vous avez gagne",
-    "cliquez ici",
-    "cliquer ici",
-    "bit.ly",
-    "tinyurl",
-    "dépêchez",
-    "depechez",
-    "urgent",
-    "immédiatement",
-    "immediatement",
-    "offre limitée",
-    "offre limitee",
-    "anniversaire",
-    "gratuit",
-    "cadeau",
-    "récompense",
-    "recompense",
-    "confirmer",
-    "vérifier votre",
-    "verifier votre",
-    "votre compte",
-    "suspendu",
-    "bloqué",
-    "bloque",
-    "expiré",
-    "expire",
-    "gagnant",
-    "loterie",
-    "prix",
-    "transfert",
+    "cliquez ici", "cliquer ici", "bit.ly", "tinyurl",
+    "dépêchez", "depechez", "urgent", "immédiatement", "immediatement",
+    "offre limitée", "offre limitee", "anniversaire", "gratuit",
+    "confirmer", "vérifier votre", "verifier votre", "votre compte",
+    "suspendu", "bloqué", "bloque", "expiré", "expire", "transfert",
 ]
 
 # ============================================================
-# NUMÉROS OFFICIELS MTN/ORANGE CAMEROUN
+# NUMÉROS/SHORT CODES OFFICIELS (MTN/Orange/Camtel Cameroun)
 # ============================================================
 NUMEROS_OFFICIELS = [
-    "1212",
-    "1313",
-    "8686",
-    "655",
-    "699",
-    "677",
-    "676",
-    "222",
-    "8181",
-    "1010",
+    "1212", "1313", "8686", "8181", "1010",
+    "655", "699", "677", "676", "222",
 ]
 
 # ============================================================
 # DOMAINES SUSPECTS
 # ============================================================
 DOMAINES_SUSPECTS = [
-    "bit.ly",
-    "tinyurl.com",
-    "goo.gl",
-    "t.co",
-    "ow.ly",
-    "is.gd",
-    "buff.ly",
-    "adf.ly",
-    "tiny.cc",
+    "bit.ly", "tinyurl.com", "goo.gl", "t.co",
+    "ow.ly", "is.gd", "buff.ly", "adf.ly", "tiny.cc",
 ]
 
 # ============================================================
-# MOTEUR DE DÉTECTION PRINCIPAL
+# PRÉFIXES OPÉRATEURS — approximatif, à confirmer avec de vrais numéros
+# ============================================================
+PREFIXES_OPERATEURS = {
+    'mtn':    ['650', '651', '652', '653', '654', '67', '680', '681', '682', '683', '684'],
+    'orange': ['655', '656', '657', '658', '659', '69', '685', '686', '687', '688', '689'],
+    'camtel': ['62', '66'],
+}
+
+
+def detecter_operateur(numero):
+    """
+    Tente de détecter l'opérateur depuis le préfixe.
+    Retourne le code opérateur détecté, ou None si non reconnu
+    (dans ce cas l'app mobile doit proposer un choix manuel).
+    """
+    if not numero:
+        return None
+    numero_propre = re.sub(r'\D', '', numero)
+    if numero_propre.startswith('237'):
+        numero_propre = numero_propre[3:]
+    for operateur, prefixes in PREFIXES_OPERATEURS.items():
+        for prefixe in prefixes:
+            if numero_propre.startswith(prefixe):
+                return operateur
+    return None
+
+
+def est_numero_officiel(numero):
+    """Un numéro/short code officiel (pas un numéro de téléphone classique)."""
+    if not numero:
+        return False
+    return any(numero.startswith(n) or numero == n for n in NUMEROS_OFFICIELS)
+
+
+def est_numero_telephone_ordinaire(numero):
+    """Un numéro camerounais standard (9 chiffres, commence par 6)."""
+    if not numero:
+        return False
+    return bool(re.match(r'^\+?237?6\d{8}$', numero.strip()))
+
+
+# ============================================================
+# MOTEUR PRINCIPAL
 # ============================================================
 
 def analyser_message(message, expediteur=""):
     """
-    Analyse un message et retourne un score de risque
-    Score : 0 à 100
-    Niveau : 1=Suspect, 2=Très suspect, 3=Confirmé arnaque
+    Analyse un message et retourne un score + le type d'arnaque probable.
+    Score : 0-100 | Niveau : 0=sûr, 1=Suspect, 2=Très suspect, 3=Confirmé
     """
-    score = 0
-    details = []
     message_lower = message.lower()
 
-    # ── Règle 1 : Expéditeur numéro ordinaire ──
+    # ── Règle absolue : demande de code/PIN/mot de passe ──
+    for mot in MOTS_CONFIRMATION:
+        if mot in message_lower:
+            return {
+                "score": 100,
+                "niveau": 3,
+                "niveau_label": "🔴 ARNAQUE CONFIRMÉE",
+                "type_detecte": "faux_conseiller",
+                "recommandation": "Ne communiquez jamais votre code PIN, mot de passe ou code de confirmation. Aucun agent légitime ne le demande. Bloquez ce numéro immédiatement.",
+                "details": [f"🚨 Demande de code/PIN/mot de passe détectée : '{mot}' — signal absolu de fraude"],
+            }
+
+    score = 0
+    details = []
+    type_detecte = None
+
+    # ── Expéditeur ordinaire = signal principal du faux dépôt/faux bancaire ──
     if expediteur:
-        est_officiel = False
-        for num in NUMEROS_OFFICIELS:
-            if expediteur.startswith(num) or expediteur == num:
-                est_officiel = True
-                break
-        
-        if not est_officiel and re.match(r'^\+?237?6\d{8}$', expediteur):
-            score += 40
-            details.append("⚠️ Expéditeur est un numéro ordinaire (non officiel)")
-        elif est_officiel:
-            details.append("✅ Expéditeur semble officiel")
+        if est_numero_officiel(expediteur):
+            details.append("✅ Expéditeur reconnu comme un numéro/short code officiel")
+        elif est_numero_telephone_ordinaire(expediteur):
+            score += 50
+            type_detecte = "faux_depot"
+            details.append("⚠️ Expéditeur est un numéro de téléphone ordinaire, pas un expéditeur officiel — signal principal d'arnaque au faux dépôt/faux message bancaire")
 
-    # ── Règle 2 : Mots-clés critiques ──
-    for mot in MOTS_CRITIQUES:
-        if mot in message_lower:
-            score += 35
-            details.append(f"🚨 Mot critique détecté : '{mot}'")
-            break  # Un seul suffit
+    # ── Fausse loterie / gain ──
+    mots_loterie = [m for m in MOTS_LOTERIE if m in message_lower]
+    if mots_loterie:
+        score += 30
+        type_detecte = type_detecte or "fausse_loterie"
+        details.append(f"🎉 Formulation typique de fausse loterie/gain : {', '.join(mots_loterie[:2])}")
 
-    # ── Règle 3 : Mots-clés suspects ──
-    mots_trouves = []
-    for mot in MOTS_SUSPECTS:
-        if mot in message_lower:
-            mots_trouves.append(mot)
-    
+    # ── Mots-clés suspects généraux ──
+    mots_trouves = [m for m in MOTS_SUSPECTS if m in message_lower]
     if mots_trouves:
-        score += min(len(mots_trouves) * 5, 25)
+        score += min(len(mots_trouves) * 5, 20)
         details.append(f"⚠️ Mots suspects trouvés : {', '.join(mots_trouves[:3])}")
 
-    # ── Règle 4 : Présence de liens ──
+    # ── Liens ──
     liens = re.findall(r'http[s]?://\S+|www\.\S+|bit\.ly\S*|tinyurl\S*', message_lower)
     if liens:
-        score += 20
-        details.append(f"🔗 Lien suspect détecté dans le message")
-        
+        score += 25
+        type_detecte = type_detecte or "lien_suspect"
+        details.append("🔗 Lien détecté dans le message")
         for lien in liens:
             for domaine in DOMAINES_SUSPECTS:
                 if domaine in lien:
@@ -151,122 +164,94 @@ def analyser_message(message, expediteur=""):
                     details.append(f"🚨 Lien raccourci dangereux : {domaine}")
                     break
 
-    # ── Règle 5 : Erreur de calcul ──
+    # ── Erreur de calcul (indice complémentaire) ──
     montants = re.findall(r'\d+(?:\s?\d+)*(?:\s?fcfa|\s?f\.?cfa|\s?xaf)?', message_lower)
     if len(montants) >= 2:
         try:
             nombres = [int(re.sub(r'\D', '', m)) for m in montants if re.sub(r'\D', '', m)]
             nombres = [n for n in nombres if n > 100]
-            if len(nombres) >= 2:
-                if nombres[1] < nombres[0]:
-                    score += 15
-                    details.append("🧮 Erreur de calcul détectée (solde incohérent)")
-        except:
+            if len(nombres) >= 2 and nombres[1] < nombres[0]:
+                score += 10
+                details.append("🧮 Erreur de calcul détectée (solde incohérent) — indice supplémentaire")
+        except Exception:
             pass
 
-    # ── Règle 6 : Montant trop élevé suspect ──
-    if any(word in message_lower for word in ['500000', '1000000', '5000000', '10000000']):
-        score += 10
-        details.append("💰 Montant anormalement élevé")
-
-    # ── Règle 7 : Urgence ──
+    # ── Urgence artificielle ──
     mots_urgence = ['urgent', 'immédiatement', 'immediatement', 'maintenant', 'vite', 'dépêchez', 'depechez', 'expire dans']
-    for mot in mots_urgence:
-        if mot in message_lower:
-            score += 10
-            details.append("⏰ Message d'urgence artificielle détecté")
-            break
+    if any(mot in message_lower for mot in mots_urgence):
+        score += 10
+        details.append("⏰ Message d'urgence artificielle détecté")
 
-    # ── Score final ──
     score = min(score, 100)
 
-    # ── Déterminer le niveau ──
     if score >= 70:
-        niveau = 3
-        niveau_label = "🔴 ARNAQUE CONFIRMÉE"
-        recommandation = "Bloquer immédiatement ce numéro et ne pas répondre"
+        niveau, niveau_label, recommandation = 3, "🔴 ARNAQUE CONFIRMÉE", "Bloquez ce numéro immédiatement et ne répondez pas"
     elif score >= 40:
-        niveau = 2
-        niveau_label = "🟠 TRÈS SUSPECT"
-        recommandation = "Soyez très prudent, évitez de répondre ou de cliquer"
+        niveau, niveau_label, recommandation = 2, "🟠 TRÈS SUSPECT", "Soyez très prudent, évitez de répondre ou de cliquer"
     elif score >= 20:
-        niveau = 1
-        niveau_label = "🟡 SUSPECT"
-        recommandation = "Restez vigilant avec ce message"
+        niveau, niveau_label, recommandation = 1, "🟡 SUSPECT", "Restez vigilant avec ce message"
     else:
-        niveau = 0
-        niveau_label = "🟢 PROBABLEMENT SÛR"
-        recommandation = "Ce message semble légitime"
+        niveau, niveau_label, recommandation = 0, "🟢 PROBABLEMENT SÛR", "Ce message semble légitime"
 
     return {
         "score": score,
         "niveau": niveau,
         "niveau_label": niveau_label,
+        "type_detecte": type_detecte or "autre",
         "recommandation": recommandation,
-        "details": details,
+        "details": details or ["Aucun signal suspect détecté"],
     }
 
 
 def analyser_numero(numero):
     """
-    Analyse un numéro de téléphone
+    Vérification directe d'un numéro (aussi utilisée pour un appel entrant :
+    la seule chose qui compte pour un appel est sa présence dans la base
+    communautaire, vérifiée séparément côté vue).
     """
-    score = 0
     details = []
+    operateur_detecte = detecter_operateur(numero)
 
-    # Vérifier si numéro officiel
-    est_officiel = False
-    for num in NUMEROS_OFFICIELS:
-        if numero.startswith(num) or numero == num:
-            est_officiel = True
-            break
-
-    if est_officiel:
+    if est_numero_officiel(numero):
         return {
-            "score": 0,
-            "niveau": 0,
+            "score": 0, "niveau": 0,
             "niveau_label": "🟢 NUMÉRO OFFICIEL",
-            "recommandation": "Ce numéro semble être un numéro officiel MTN/Orange",
+            "operateur_detecte": operateur_detecte,
+            "recommandation": "Ce numéro semble être un numéro/short code officiel",
             "details": ["✅ Numéro court officiel reconnu"],
         }
 
-    # Numéro camerounais ordinaire
-    if re.match(r'^\+?237?6\d{8}$', numero):
-        score += 10
-        details.append("📱 Numéro camerounais ordinaire")
+    score = 5 if est_numero_telephone_ordinaire(numero) else 0
+    if score:
+        details.append("📱 Numéro camerounais ordinaire — vérifiez son historique dans la base communautaire")
 
     return {
         "score": score,
         "niveau": 1 if score > 0 else 0,
-        "niveau_label": "🟡 SUSPECT" if score > 0 else "🟢 INCONNU",
-        "recommandation": "Vérifiez ce numéro dans la base communautaire",
-        "details": details,
+        "niveau_label": "🟡 À VÉRIFIER" if score > 0 else "🟢 INCONNU",
+        "operateur_detecte": operateur_detecte,
+        "recommandation": "Consultez la base communautaire pour voir si ce numéro a déjà été signalé",
+        "details": details or ["Aucune information disponible sur ce numéro"],
     }
 
 
 def analyser_lien(url):
-    """
-    Analyse un lien/URL
-    """
+    """Analyse un lien (utilisé pour lien_suspect ET whatsapp, selon le canal)."""
     score = 0
     details = []
     url_lower = url.lower()
 
-    # Vérifier domaines suspects
     for domaine in DOMAINES_SUSPECTS:
         if domaine in url_lower:
             score += 50
             details.append(f"🚨 Domaine dangereux détecté : {domaine}")
             break
 
-    # Vérifier mots suspects dans l'URL
-    mots_url_suspects = ['gagner', 'gagne', 'prix', 'cadeau', 'gratuit', 'anniversaire', 'offre', 'promo']
-    for mot in mots_url_suspects:
+    for mot in ['gagner', 'gagne', 'prix', 'cadeau', 'gratuit', 'anniversaire', 'offre', 'promo']:
         if mot in url_lower:
             score += 20
             details.append(f"⚠️ Mot suspect dans l'URL : '{mot}'")
 
-    # URL trop longue et bizarre
     if len(url) > 100:
         score += 10
         details.append("⚠️ URL anormalement longue")
@@ -274,26 +259,16 @@ def analyser_lien(url):
     score = min(score, 100)
 
     if score >= 70:
-        niveau = 3
-        niveau_label = "🔴 LIEN DANGEREUX"
-        recommandation = "Ne cliquez surtout pas sur ce lien"
+        niveau, niveau_label, recommandation = 3, "🔴 LIEN DANGEREUX", "Ne cliquez surtout pas sur ce lien"
     elif score >= 40:
-        niveau = 2
-        niveau_label = "🟠 LIEN TRÈS SUSPECT"
-        recommandation = "Évitez de cliquer sur ce lien"
+        niveau, niveau_label, recommandation = 2, "🟠 LIEN TRÈS SUSPECT", "Évitez de cliquer sur ce lien"
     elif score >= 20:
-        niveau = 1
-        niveau_label = "🟡 LIEN SUSPECT"
-        recommandation = "Soyez prudent avec ce lien"
+        niveau, niveau_label, recommandation = 1, "🟡 LIEN SUSPECT", "Soyez prudent avec ce lien"
     else:
-        niveau = 0
-        niveau_label = "🟢 LIEN PROBABLEMENT SÛR"
-        recommandation = "Ce lien semble légitime"
+        niveau, niveau_label, recommandation = 0, "🟢 LIEN PROBABLEMENT SÛR", "Ce lien semble légitime"
 
     return {
-        "score": score,
-        "niveau": niveau,
-        "niveau_label": niveau_label,
+        "score": score, "niveau": niveau, "niveau_label": niveau_label,
         "recommandation": recommandation,
-        "details": details,
+        "details": details or ["Aucun signal suspect détecté"],
     }
