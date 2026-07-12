@@ -341,5 +341,8 @@ def extraire_info_capture(image_base64, mime_type="image/jpeg"):
             'erreur': None,
         }
 
-    except Exception as e:
+   except Exception as e:
+        print(f"[GEMINI ERREUR] {type(e).__name__}: {str(e)}")
+        if 'response' in dir(e) and hasattr(e, 'response') and e.response is not None:
+            print(f"[GEMINI REPONSE BRUTE] {e.response.text[:500]}")
         return {'expediteur': '', 'message': '', 'erreur': f"Erreur lors de l'analyse de l'image : {str(e)}"}
