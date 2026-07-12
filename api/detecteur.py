@@ -272,3 +272,68 @@ def analyser_lien(url):
         "recommandation": recommandation,
         "details": details or ["Aucun signal suspect détecté"],
     }
+
+
+# ============================================================
+# ANALYSE PAR IMAGE (via Gemini) — extraction expéditeur + message
+# ============================================================
+
+import requests as _requests
+from django.conf import settings
+
+
+def extraire_info_capture(image_base64, mime_type="image/jpeg"):
+    """
+    Envoie une capture d'écran à Gemini pour en extraire :
+    - le nom/numéro de l'expéditeur visible
+    - le texte du message
+    Retourne un dict {'expediteur': str, 'message': str, 'erreur': str|None}
+    """
+    api_key = settings.GEMINI_API_KEY
+    if not api_key:
+        return {'expediteur': '', 'message': '', 'erreur': 'Clé API Gemini non configurée sur le serveur'}
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+
+    prompt = (
+        "Tu regardes une capture d'écran d'un SMS, d'une notification WhatsApp ou d'un message. "
+        "Extrait UNIQUEMENT deux informations et réponds STRICTEMENT en JSON, sans aucun texte autour : "
+        '{"expediteur": "le nom ou numéro de l\'expéditeur tel qu\'affiché", "message": "le texte complet du message"}. '
+        "Si tu ne trouves pas l'expéditeur, mets une chaîne vide. "
+        "Ne résume pas le message, recopie-le exactement tel qu'il apparaît."
+    )
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {"inline_data": {"mime_type": mime_type, "data": image_base64}}
+            ]
+        }]
+    }
+
+    try:
+        response = _requests.post(url, json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        texte_reponse = data["candidates"][0]["content"]["parts"][0]["text"]
+
+        # Nettoyage : Gemini répond parfois avec ```json ... ``` autour
+        texte_reponse = texte_reponse.strip()
+        if texte_reponse.startswith("```"):
+            texte_reponse = texte_reponse.split("```")[1]
+            if texte_reponse.startswith("json"):
+                texte_reponse = texte_reponse[4:]
+
+        import json
+        resultat = json.loads(texte_reponse.strip())
+
+        return {
+            'expediteur': resultat.get('expediteur', '').strip(),
+            'message': resultat.get('message', '').strip(),
+            'erreur': None,
+        }
+
+    except Exception as e:
+        return {'expediteur': '', 'message': '', 'erreur': f"Erreur lors de l'analyse de l'image : {str(e)}"}

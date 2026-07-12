@@ -8,6 +8,7 @@ from django.utils.dateparse import parse_date, parse_time
 from django.db.models import Count
 from django.db.models.functions import TruncDate, TruncWeek, TruncMonth, TruncYear
 from datetime import datetime
+from .detecteur import analyser_message, analyser_numero, analyser_lien, detecter_operateur, extraire_info_capture
 
 from .models import (
     ProfilUtilisateur,
@@ -454,5 +455,48 @@ def liste_bloques(request):
             'manuel': b.bloque_manuellement, 'exception': b.exception
         } for b in bloques]
         return Response({'succes': True, 'bloques': data})
+    except Exception as e:
+        return Response({'succes': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def analyser_capture_vue(request):
+    """Analyser une capture d'écran : extraction via Gemini puis scoring par nos règles."""
+    try:
+        image_base64 = request.data.get('image_base64', '')
+        mime_type = request.data.get('mime_type', 'image/jpeg')
+
+        if not image_base64:
+            return Response({'succes': False, 'message': 'Image requise'}, status=status.HTTP_400_BAD_REQUEST)
+
+        extraction = extraire_info_capture(image_base64, mime_type)
+
+        if extraction['erreur']:
+            return Response({'succes': False, 'message': extraction['erreur']}, status=status.HTTP_502_BAD_GATEWAY)
+
+        if not extraction['message']:
+            return Response({
+                'succes': False,
+                'message': "Aucun texte n'a pu être extrait de cette image. Essayez une capture plus nette."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        expediteur = extraction['expediteur']
+        resultat = analyser_message(extraction['message'], expediteur)
+        resultat['operateur_detecte'] = detecter_operateur(expediteur) if expediteur else None
+        resultat['texte_extrait'] = extraction['message']
+        resultat['expediteur_extrait'] = expediteur
+
+        if expediteur:
+            try:
+                numero_db = NumeroCommunautaire.objects.get(numero=expediteur)
+                resultat['dans_base_communautaire'] = True
+                resultat['signalements_communaute'] = numero_db.nombre_signalements
+                resultat['score'] = min(resultat['score'] + 20, 100)
+                resultat['details'].append(f"🚨 Numéro déjà signalé {numero_db.nombre_signalements} fois dans la communauté")
+            except NumeroCommunautaire.DoesNotExist:
+                resultat['dans_base_communautaire'] = False
+
+        return Response({'succes': True, 'resultat': resultat})
+
     except Exception as e:
         return Response({'succes': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

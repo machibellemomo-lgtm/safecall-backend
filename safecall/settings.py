@@ -147,3 +147,5 @@ TIME_ZONE = 'Africa/Douala'
 # Fichiers statiques (CSS, JS) pour l'interface Admin en ligne
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')

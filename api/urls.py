@@ -10,6 +10,7 @@ urlpatterns = [
     path('analyser/message/', views.analyser_message_vue, name='analyser_message'),
     path('analyser/numero/', views.analyser_numero_vue, name='analyser_numero'),
     path('analyser/lien/', views.analyser_lien_vue, name='analyser_lien'),
+    path('analyser/capture/', views.analyser_capture_vue, name='analyser_capture'),
 
     # ── Base communautaire ──
     path('communaute/liste/', views.liste_numeros_frauduleux, name='liste_numeros'),
