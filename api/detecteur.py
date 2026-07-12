@@ -55,6 +55,18 @@ EXPEDITEURS_MOBILE_MONEY_OFFICIELS = [
     "orangemoney",
     "mobilemoney",
 ]
+EXPEDITEURS_BANQUES_OFFICIELS = [
+    "afb", "afriland",
+    "bicec",
+    "sgc", "societegenerale",
+    "uba",
+    "scb",
+    "cbc",
+    "ecobank",
+    "stanchart",
+    "bacm",
+    "bgfi",
+]
 
 # ============================================================
 # DOMAINES SUSPECTS
@@ -93,13 +105,15 @@ def detecter_operateur(numero):
 
 
 def est_numero_officiel(numero):
-    """Un numéro/short code officiel, ou un nom d'expéditeur Mobile Money reconnu."""
+    """Un numéro/short code officiel, ou un nom d'expéditeur Mobile Money/banque reconnu."""
     if not numero:
         return False
-    numero_normalise = numero.strip().lower().replace(" ", "")
+    numero_normalise = numero.strip().lower().replace(" ", "").replace("-", "")
     if any(numero.startswith(n) or numero == n for n in NUMEROS_OFFICIELS):
         return True
     if numero_normalise in EXPEDITEURS_MOBILE_MONEY_OFFICIELS:
+        return True
+    if numero_normalise in EXPEDITEURS_BANQUES_OFFICIELS:
         return True
     return False
 
