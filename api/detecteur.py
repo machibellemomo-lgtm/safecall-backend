@@ -48,8 +48,12 @@ MOTS_SUSPECTS = [
 # NUMÉROS/SHORT CODES OFFICIELS (MTN/Orange/Camtel Cameroun)
 # ============================================================
 NUMEROS_OFFICIELS = [
-    "1212", "1313", "8686", "8181", "1010",
-    "655", "699", "677", "676", "222",
+    "8787", "8900", "8706", 
+]
+
+EXPEDITEURS_MOBILE_MONEY_OFFICIELS = [
+    "orangemoney",
+    "mobilemoney",
 ]
 
 # ============================================================
@@ -89,11 +93,15 @@ def detecter_operateur(numero):
 
 
 def est_numero_officiel(numero):
-    """Un numéro/short code officiel (pas un numéro de téléphone classique)."""
+    """Un numéro/short code officiel, ou un nom d'expéditeur Mobile Money reconnu."""
     if not numero:
         return False
-    return any(numero.startswith(n) or numero == n for n in NUMEROS_OFFICIELS)
-
+    numero_normalise = numero.strip().lower().replace(" ", "")
+    if any(numero.startswith(n) or numero == n for n in NUMEROS_OFFICIELS):
+        return True
+    if numero_normalise in EXPEDITEURS_MOBILE_MONEY_OFFICIELS:
+        return True
+    return False
 
 def est_numero_telephone_ordinaire(numero):
     """Un numéro camerounais standard (9 chiffres, commence par 6)."""
