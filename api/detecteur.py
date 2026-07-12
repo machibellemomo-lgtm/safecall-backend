@@ -99,7 +99,7 @@ def est_numero_telephone_ordinaire(numero):
     """Un numéro camerounais standard (9 chiffres, commence par 6)."""
     if not numero:
         return False
-    return bool(re.match(r'^\+?237?6\d{8}$', numero.strip()))
+    return bool(re.match(r'^(\+?237)?6\d{8}$', numero.strip()))
 
 
 # ============================================================
