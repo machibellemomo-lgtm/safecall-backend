@@ -129,27 +129,17 @@ def analyser_message(message, expediteur=""):
     details = []
     type_detecte = None
 
-    # ── Expéditeur ordinaire = signal principal du faux dépôt/faux bancaire ──
+    # ── Expéditeur non reconnu comme officiel ──
     if expediteur:
         if est_numero_officiel(expediteur):
             details.append("✅ Expéditeur reconnu comme un numéro/short code officiel")
-        elif est_numero_telephone_ordinaire(expediteur):
-            score += 50
+        else:
+            score += 80
             type_detecte = "faux_depot"
-            details.append("⚠️ Expéditeur est un numéro de téléphone ordinaire, pas un expéditeur officiel — signal principal d'arnaque au faux dépôt/faux message bancaire")
-
-    # ── Fausse loterie / gain ──
-    mots_loterie = [m for m in MOTS_LOTERIE if m in message_lower]
-    if mots_loterie:
-        score += 30
-        type_detecte = type_detecte or "fausse_loterie"
-        details.append(f"🎉 Formulation typique de fausse loterie/gain : {', '.join(mots_loterie[:2])}")
-
-    # ── Mots-clés suspects généraux ──
-    mots_trouves = [m for m in MOTS_SUSPECTS if m in message_lower]
-    if mots_trouves:
-        score += min(len(mots_trouves) * 5, 20)
-        details.append(f"⚠️ Mots suspects trouvés : {', '.join(mots_trouves[:3])}")
+            if est_numero_telephone_ordinaire(expediteur):
+                details.append("🚨 Expéditeur est un numéro de téléphone ordinaire, pas un expéditeur officiel — signal fort de faux dépôt/faux message bancaire")
+            else:
+                details.append("🚨 Expéditeur non reconnu comme officiel (ni numéro, ni nom légitime) — possible usurpation d'identité")
 
     # ── Liens ──
     liens = re.findall(r'http[s]?://\S+|www\.\S+|bit\.ly\S*|tinyurl\S*', message_lower)
@@ -164,7 +154,7 @@ def analyser_message(message, expediteur=""):
                     details.append(f"🚨 Lien raccourci dangereux : {domaine}")
                     break
 
-    # ── Erreur de calcul (indice complémentaire) ──
+    # ── Erreur de calcul (indice complémentaire, vérifiable mathématiquement) ──
     montants = re.findall(r'\d+(?:\s?\d+)*(?:\s?fcfa|\s?f\.?cfa|\s?xaf)?', message_lower)
     if len(montants) >= 2:
         try:
@@ -175,12 +165,6 @@ def analyser_message(message, expediteur=""):
                 details.append("🧮 Erreur de calcul détectée (solde incohérent) — indice supplémentaire")
         except Exception:
             pass
-
-    # ── Urgence artificielle ──
-    mots_urgence = ['urgent', 'immédiatement', 'immediatement', 'maintenant', 'vite', 'dépêchez', 'depechez', 'expire dans']
-    if any(mot in message_lower for mot in mots_urgence):
-        score += 10
-        details.append("⏰ Message d'urgence artificielle détecté")
 
     score = min(score, 100)
 
@@ -199,7 +183,7 @@ def analyser_message(message, expediteur=""):
         "niveau_label": niveau_label,
         "type_detecte": type_detecte or "autre",
         "recommandation": recommandation,
-        "details": details or ["Aucun signal suspect détecté"],
+        "details": details or ["Aucun signal fiable détecté"],
     }
 
 
