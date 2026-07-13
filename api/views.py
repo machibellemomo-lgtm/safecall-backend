@@ -241,8 +241,6 @@ def detail_numero_vue(request):
                 'date_incident': s.date_incident,
                 'heure_incident': s.heure_incident,
                 'date_approximative': s.date_approximative,
-                'ville_incident': s.ville_incident,
-                'region_incident': s.region_incident,
                 'attaque_reussie': s.attaque_reussie,
                 'types_impact': [t.libelle for t in s.types_impact.all()],
                 'montant_perdu': s.montant_perdu,
@@ -253,6 +251,8 @@ def detail_numero_vue(request):
             if s.afficher_identite:
                 item['nom_declarant'] = s.nom_declarant
                 item['numero_declarant'] = s.numero_declarant
+                item['ville_incident'] = s.ville_incident
+                item['region_incident'] = s.region_incident
             data_signalements.append(item)
 
         return Response({
