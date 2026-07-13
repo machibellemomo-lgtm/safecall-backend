@@ -559,3 +559,60 @@ def analyser_capture_vue(request):
 
     except Exception as e:
         return Response({'succes': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def gestion_blocage_vue(request):
+    """Numéros Très suspects/Confirmés + décision actuelle de l'utilisateur pour chacun."""
+    try:
+        user_id = request.GET.get('user_id')
+        profil = ProfilUtilisateur.objects.get(user__id=user_id)
+
+        numeros = NumeroCommunautaire.objects.filter(niveau__gte=2).order_by('-niveau', '-nombre_signalements')
+        decisions = {b.numero_bloque: b for b in BlocageUtilisateur.objects.filter(utilisateur=profil)}
+
+        data = []
+        for n in numeros:
+            decision = decisions.get(n.numero)
+            if decision:
+                bloque = decision.bloque_manuellement and not decision.exception
+            else:
+                bloque = (n.niveau == 3)  # Confirmé = coché par défaut ; Très suspect = décoché par défaut
+
+            data.append({
+                'numero': n.numero,
+                'operateur': n.operateur,
+                'nom_precis': n.nom_precis,
+                'niveau': n.niveau,
+                'nombre_signalements': n.nombre_signalements,
+                'bloque': bloque,
+            })
+
+        return Response({'succes': True, 'numeros': data})
+    except Exception as e:
+        return Response({'succes': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def definir_blocage_vue(request):
+    """Définit si l'utilisateur veut bloquer ou faire une exception pour un numéro."""
+    try:
+        user_id = request.data.get('user_id')
+        numero = request.data.get('numero')
+        bloquer = request.data.get('bloquer', True)
+
+        profil = ProfilUtilisateur.objects.get(user__id=user_id)
+
+        blocage, created = BlocageUtilisateur.objects.get_or_create(
+            utilisateur=profil,
+            numero_bloque=numero,
+            defaults={'bloque_manuellement': bloquer, 'exception': not bloquer}
+        )
+        if not created:
+            blocage.bloque_manuellement = bloquer
+            blocage.exception = not bloquer
+            blocage.save()
+
+        return Response({'succes': True, 'message': 'Préférence enregistrée'})
+    except Exception as e:
+        return Response({'succes': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

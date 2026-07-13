@@ -23,4 +23,7 @@ urlpatterns = [
     # ── Blocage ──
     path('bloquer/', views.bloquer_numero, name='bloquer'),
     path('bloques/', views.liste_bloques, name='liste_bloques'),
+
+    path('gestion-blocage/', views.gestion_blocage_vue, name='gestion_blocage'),
+    path('blocage/definir/', views.definir_blocage_vue, name='definir_blocage'),
 ]
