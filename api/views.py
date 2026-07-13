@@ -361,6 +361,7 @@ def signaler_arnaque(request):
         nombre_reel = Signalement.objects.filter(numero_signale=numero).values('utilisateur').distinct().count()
 
         numero_db, num_created = NumeroCommunautaire.objects.get_or_create(
+            ancien_niveau = numero_db.niveau if not num_created else 0
             numero=numero,
             defaults={
                 'operateur': operateur,
@@ -388,6 +389,15 @@ def signaler_arnaque(request):
             numero_db.niveau = 1
             numero_db.score_confiance = min(30 + nombre_reel * 10, 59)
         numero_db.save()
+
+        # Blocage automatique pour tous les comptes existants au moment où le numéro devient Confirmé
+        if numero_db.niveau == 3 and ancien_niveau != 3:
+            for p in ProfilUtilisateur.objects.all():
+                BlocageUtilisateur.objects.get_or_create(
+                    utilisateur=p,
+                    numero_bloque=numero,
+                    defaults={'bloque_manuellement': False}
+                )
 
         return Response({
             'succes': True,
@@ -595,23 +605,26 @@ def gestion_blocage_vue(request):
 
 @api_view(['POST'])
 def definir_blocage_vue(request):
-    """Définit si l'utilisateur veut bloquer ou faire une exception pour un numéro."""
+    """Bloque ou débloque un numéro. 'manuel=True' = bloqué depuis le détail (compte dans 'Bloqués manuellement')."""
     try:
         user_id = request.data.get('user_id')
         numero = request.data.get('numero')
         bloquer = request.data.get('bloquer', True)
+        manuel = request.data.get('manuel', False)
 
         profil = ProfilUtilisateur.objects.get(user__id=user_id)
 
-        blocage, created = BlocageUtilisateur.objects.get_or_create(
-            utilisateur=profil,
-            numero_bloque=numero,
-            defaults={'bloque_manuellement': bloquer, 'exception': not bloquer}
-        )
-        if not created:
-            blocage.bloque_manuellement = bloquer
-            blocage.exception = not bloquer
-            blocage.save()
+        if bloquer:
+            blocage, created = BlocageUtilisateur.objects.get_or_create(
+                utilisateur=profil,
+                numero_bloque=numero,
+                defaults={'bloque_manuellement': manuel}
+            )
+            if not created:
+                blocage.bloque_manuellement = manuel
+                blocage.save()
+        else:
+            BlocageUtilisateur.objects.filter(utilisateur=profil, numero_bloque=numero).delete()
 
         return Response({'succes': True, 'message': 'Préférence enregistrée'})
     except Exception as e:
