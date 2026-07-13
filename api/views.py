@@ -361,7 +361,6 @@ def signaler_arnaque(request):
         nombre_reel = Signalement.objects.filter(numero_signale=numero).values('utilisateur').distinct().count()
 
         numero_db, num_created = NumeroCommunautaire.objects.get_or_create(
-            ancien_niveau = numero_db.niveau if not num_created else 0
             numero=numero,
             defaults={
                 'operateur': operateur,
@@ -373,6 +372,8 @@ def signaler_arnaque(request):
             }
         )
 
+        ancien_niveau = numero_db.niveau if not num_created else 0
+        
         if not num_created:
             numero_db.operateur = operateur
             numero_db.nom_precis = request.data.get('nom_precis', '') or numero_db.nom_precis
