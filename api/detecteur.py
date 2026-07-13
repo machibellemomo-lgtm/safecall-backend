@@ -299,7 +299,7 @@ def extraire_info_capture(image_base64, mime_type="image/jpeg"):
     if not api_key:
         return {'expediteur': '', 'message': '', 'erreur': 'Clé API Gemini non configurée sur le serveur'}
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
 
     prompt = (
         "Tu regardes une capture d'écran d'un SMS, d'une notification WhatsApp ou d'un message. "
