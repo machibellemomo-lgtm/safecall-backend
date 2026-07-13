@@ -215,6 +215,65 @@ def liste_numeros_frauduleux(request):
         return Response({'succes': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['GET'])
+def detail_numero_vue(request):
+    """Détail complet d'un numéro : agrégat + historique de tous les signalements individuels."""
+    try:
+        numero = request.GET.get('numero', '')
+        if not numero:
+            return Response({'succes': False, 'message': 'Numéro requis'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            numero_db = NumeroCommunautaire.objects.get(numero=numero)
+        except NumeroCommunautaire.DoesNotExist:
+            return Response({'succes': False, 'message': 'Numéro non trouvé dans la base communautaire'}, status=status.HTTP_404_NOT_FOUND)
+
+        total_signalements_global = Signalement.objects.count() or 1
+        pourcentage = round((numero_db.nombre_signalements / total_signalements_global) * 100, 1)
+
+        signalements = Signalement.objects.filter(numero_signale=numero).order_by('-date_incident')
+
+        data_signalements = []
+        for s in signalements:
+            item = {
+                'type_arnaque': s.type_arnaque,
+                'moyen_utilise': s.moyen_utilise,
+                'date_incident': s.date_incident,
+                'heure_incident': s.heure_incident,
+                'date_approximative': s.date_approximative,
+                'ville_incident': s.ville_incident,
+                'region_incident': s.region_incident,
+                'attaque_reussie': s.attaque_reussie,
+                'types_impact': [t.libelle for t in s.types_impact.all()],
+                'montant_perdu': s.montant_perdu,
+                'description_impact': s.description_impact,
+                'description': s.description,
+                'message_recu': s.message_recu,
+            }
+            if s.afficher_identite:
+                item['nom_declarant'] = s.nom_declarant
+                item['numero_declarant'] = s.numero_declarant
+            data_signalements.append(item)
+
+        return Response({
+            'succes': True,
+            'numero': {
+                'numero': numero_db.numero,
+                'operateur': numero_db.operateur,
+                'nom_precis': numero_db.nom_precis,
+                'niveau': numero_db.niveau,
+                'nombre_signalements': numero_db.nombre_signalements,
+                'pourcentage': pourcentage,
+                'confirme': numero_db.confirme,
+                'premier_signalement': numero_db.premier_signalement,
+                'dernier_signalement': numero_db.dernier_signalement,
+            },
+            'signalements': data_signalements,
+        })
+    except Exception as e:
+        return Response({'succes': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(['POST'])
 def signaler_arnaque(request):
     """

@@ -16,7 +16,7 @@ urlpatterns = [
     path('communaute/liste/', views.liste_numeros_frauduleux, name='liste_numeros'),
     path('communaute/signaler/', views.signaler_arnaque, name='signaler'),
     path('communaute/types-impact/', views.liste_types_impact, name='liste_types_impact'),  # ← nouveau
-
+    path('communaute/detail/', views.detail_numero_vue, name='detail_numero'),
     # ── Statistiques ──
     path('stats/', views.statistiques, name='statistiques'),
 
