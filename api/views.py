@@ -508,7 +508,7 @@ def liste_bloques(request):
     try:
         user_id = request.GET.get('user_id')
         profil = ProfilUtilisateur.objects.get(user__id=user_id)
-        bloques = BlocageUtilisateur.objects.filter(utilisateur=profil)
+        bloques = BlocageUtilisateur.objects.filter(utilisateur=profil, bloque_manuellement=True)
         data = [{
             'numero': b.numero_bloque, 'date_blocage': b.date_blocage,
             'manuel': b.bloque_manuellement, 'exception': b.exception
