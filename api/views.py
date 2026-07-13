@@ -76,6 +76,33 @@ def connexion(request):
         return Response({'succes': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['POST'])
+def modifier_profil_vue(request):
+    """Modifier ville et/ou numéro de téléphone du profil connecté."""
+    try:
+        user_id = request.data.get('user_id')
+        numero_telephone = request.data.get('numero_telephone', '').strip()
+        ville = request.data.get('ville', '').strip()
+
+        profil = ProfilUtilisateur.objects.get(user__id=user_id)
+
+        if numero_telephone and numero_telephone != profil.numero_telephone:
+            if ProfilUtilisateur.objects.filter(numero_telephone=numero_telephone).exclude(id=profil.id).exists():
+                return Response({'succes': False, 'message': 'Ce numéro est déjà utilisé par un autre compte'}, status=status.HTTP_400_BAD_REQUEST)
+            profil.numero_telephone = numero_telephone
+
+        profil.ville = ville
+        profil.save()
+
+        return Response({
+            'succes': True,
+            'message': 'Profil mis à jour avec succès',
+            'numero_telephone': profil.numero_telephone,
+            'ville': profil.ville,
+        })
+    except Exception as e:
+        return Response({'succes': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 # ============================================================
 # ANALYSE
 # ============================================================
@@ -373,7 +400,7 @@ def signaler_arnaque(request):
         )
 
         ancien_niveau = numero_db.niveau if not num_created else 0
-        
+
         if not num_created:
             numero_db.operateur = operateur
             numero_db.nom_precis = request.data.get('nom_precis', '') or numero_db.nom_precis

@@ -26,4 +26,6 @@ urlpatterns = [
 
     path('gestion-blocage/', views.gestion_blocage_vue, name='gestion_blocage'),
     path('blocage/definir/', views.definir_blocage_vue, name='definir_blocage'),
+
+    path('auth/modifier-profil/', views.modifier_profil_vue, name='modifier_profil'),
 ]
